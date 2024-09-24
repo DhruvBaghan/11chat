@@ -59,10 +59,13 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 socket.on('ready', () => {
     if (!peerConnection) {
         peerConnection = new RTCPeerConnection(config);
-        peerConnection.addStream(localStream);
+        // Adding tracks instead of the deprecated addStream
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
 
-        peerConnection.onaddstream = (event) => {
-            document.getElementById('remoteVideo').srcObject = event.stream;
+        peerConnection.ontrack = (event) => {
+            document.getElementById('remoteVideo').srcObject = event.streams[0]; // Updated to event.streams
         };
 
         peerConnection.onicecandidate = (event) => {
@@ -73,35 +76,55 @@ socket.on('ready', () => {
 
         peerConnection.createOffer()
             .then(offer => {
-                peerConnection.setLocalDescription(offer);
-                socket.emit('offer', { offer, roomID: currentRoomID });
+                return peerConnection.setLocalDescription(offer);
+            })
+            .then(() => {
+                socket.emit('offer', { offer: peerConnection.localDescription, roomID: currentRoomID });
+            })
+            .catch(error => {
+                console.error('Error creating offer:', error);
             });
     }
 });
 
 socket.on('offer', (offer) => {
     peerConnection = new RTCPeerConnection(config);
-    peerConnection.addStream(localStream);
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
 
-    peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    peerConnection.createAnswer()
+    peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+        .then(() => {
+            return peerConnection.createAnswer();
+        })
         .then(answer => {
-            peerConnection.setLocalDescription(answer);
-            socket.emit('answer', { answer, roomID: currentRoomID });
+            return peerConnection.setLocalDescription(answer);
+        })
+        .then(() => {
+            socket.emit('answer', { answer: peerConnection.localDescription, roomID: currentRoomID });
+        })
+        .catch(error => {
+            console.error('Error handling offer:', error);
         });
 
-    peerConnection.onaddstream = (event) => {
-        document.getElementById('remoteVideo').srcObject = event.stream;
+    peerConnection.ontrack = (event) => {
+        document.getElementById('remoteVideo').srcObject = event.streams[0]; // Updated to event.streams
     };
 });
 
 socket.on('answer', (answer) => {
-    peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+        .catch(error => {
+            console.error('Error setting remote description:', error);
+        });
 });
 
 socket.on('candidate', (candidate) => {
     const iceCandidate = new RTCIceCandidate(candidate);
-    peerConnection.addIceCandidate(iceCandidate);
+    peerConnection.addIceCandidate(iceCandidate)
+        .catch(error => {
+            console.error('Error adding received ICE candidate:', error);
+        });
 });
 
 // Mute audio button functionality
