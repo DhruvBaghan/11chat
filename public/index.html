@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1-to-1 Video Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="loginPage" style="display:block;">
+        <h2>Create or Join Room</h2>
+        <input type="text" id="username" placeholder="Enter your name">
+        <button onclick="createRoom()">Create Room</button>
+        <br><br>
+        <input type="text" id="roomIdInput" placeholder="Enter Room ID">
+        <button onclick="joinRoom()">Join Room</button>
+        <p id="loginError" style="display:none;">Please enter a username!</p>
+    </div>
+
+    <div id="chatPage" style="display:none;">
+        <h1>1-to-1 Video Chat</h1>
+        <p id="roomIdDisplay"></p> <!-- Room ID displayed here -->
+        <div class="video-container">
+            <video id="localVideo" autoplay playsinline></video>
+            <p id="localName"></p>
+        </div>
+        <div class="video-container">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <p id="remoteName"></p>
+        </div>
+        <p id="callStatus">Waiting for connection...</p>
+        <button id="muteAudio">Mute Audio</button>
+        <button id="toggleVideo">Toggle Video</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
