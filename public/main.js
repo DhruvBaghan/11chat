@@ -34,14 +34,14 @@ socket.on('roomCreated', ({ roomID }) => {
     currentRoomID = roomID; // Set the current room ID
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('chatPage').style.display = 'block';
-    document.getElementById('roomIdDisplay').textContent = `Room ID: ${roomID}`;
+    document.getElementById('roomIdDisplay').textContent = `Room ID: ${roomID}`; // Corrected string interpolation
 });
 
 socket.on('roomJoined', ({ roomID }) => {
     currentRoomID = roomID; // Set the current room ID
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('chatPage').style.display = 'block';
-    document.getElementById('roomIdDisplay').textContent = `Room ID: ${roomID}`;
+    document.getElementById('roomIdDisplay').textContent = `Room ID: ${roomID}`; // Corrected string interpolation
 });
 
 // Get media stream from user's camera and microphone
@@ -59,7 +59,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 socket.on('ready', () => {
     if (!peerConnection) {
         peerConnection = new RTCPeerConnection(config);
-        // Adding tracks instead of the deprecated addStream
+        
         localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
         });
@@ -75,9 +75,7 @@ socket.on('ready', () => {
         };
 
         peerConnection.createOffer()
-            .then(offer => {
-                return peerConnection.setLocalDescription(offer);
-            })
+            .then(offer => peerConnection.setLocalDescription(offer))
             .then(() => {
                 socket.emit('offer', { offer: peerConnection.localDescription, roomID: currentRoomID });
             })
@@ -88,35 +86,44 @@ socket.on('ready', () => {
 });
 
 socket.on('offer', (offer) => {
-    peerConnection = new RTCPeerConnection(config);
-    localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-    });
+    if (!peerConnection) {
+        peerConnection = new RTCPeerConnection(config);
+
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+
+        peerConnection.ontrack = (event) => {
+            document.getElementById('remoteVideo').srcObject = event.streams[0]; // Updated to event.streams
+        };
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('candidate', { candidate: event.candidate, roomID: currentRoomID });
+            }
+        };
+    }
 
     peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
-        .then(() => {
-            return peerConnection.createAnswer();
-        })
-        .then(answer => {
-            return peerConnection.setLocalDescription(answer);
-        })
+        .then(() => peerConnection.createAnswer())
+        .then(answer => peerConnection.setLocalDescription(answer))
         .then(() => {
             socket.emit('answer', { answer: peerConnection.localDescription, roomID: currentRoomID });
         })
         .catch(error => {
             console.error('Error handling offer:', error);
         });
-
-    peerConnection.ontrack = (event) => {
-        document.getElementById('remoteVideo').srcObject = event.streams[0]; // Updated to event.streams
-    };
 });
 
 socket.on('answer', (answer) => {
-    peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
-        .catch(error => {
-            console.error('Error setting remote description:', error);
-        });
+    if (peerConnection.signalingState === 'have-local-offer') { // Fix incorrect signaling state check
+        peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+            .catch(error => {
+                console.error('Error setting remote description:', error);
+            });
+    } else {
+        console.error(`Invalid signaling state: ${peerConnection.signalingState}`);
+    }
 });
 
 socket.on('candidate', (candidate) => {
